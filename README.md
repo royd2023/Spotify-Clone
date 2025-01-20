@@ -9,9 +9,9 @@ Features So Far:
 - 10 second skip forward and backward
 - play/pause
 - autoplay
+- shuffle
 
 Plan on Adding:
-- shuffle/random 
 - playlists
 - metadata/cloud storage???
 - decoration
