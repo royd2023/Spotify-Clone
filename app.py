@@ -1,3 +1,4 @@
+import random
 from tkinter import *
 import tkinter as tk
 from PIL import ImageTk, Image 
@@ -21,6 +22,7 @@ def create_frame(parent, **options):
 playback = Playback()
 
 song_slider = None
+slider_update_id = None
 
 
 
@@ -31,8 +33,10 @@ def load_music(song_name, frame):
 
 # creates the song slider
 def create_song_slider(frame):
-    global song_slider
+    global song_slider, slider_update_id
     if song_slider is not None:
+        if slider_update_id is not None:
+            song_slider.after_cancel(slider_update_id)
         song_slider.destroy()
 
     song_slider = Scale(frame, orient='horizontal', from_= 0, to=playback.duration, length=300)
@@ -40,7 +44,7 @@ def create_song_slider(frame):
     song_slider.bind("<ButtonRelease-1>", update_slider)
     update_slider_position()
 
-# updates the slider bar
+# updates the slider bar when user drags it
 # the parameter 'event' is not used
 def update_slider(event):
     value = song_slider.get() # Get the current slider value
@@ -49,18 +53,17 @@ def update_slider(event):
   
 
 def update_slider_position():
-    
+    global slider_update_id
     # Get the current playback position and update the slider
     curr_pos = playback.curr_pos
     song_slider.set(curr_pos)    
     # Schedule the next update
     if playback.curr_pos < playback.duration - 1.25 :
-        song_slider.after(1000, update_slider_position)
+        slider_update_id = song_slider.after(1000, update_slider_position)
     
 
     if playback.curr_pos >= playback.duration - 1.5 :
         if autoplay == True:
-            print("autoplay is on and the song is done playing")
             play_next_song()
         else:
             print("Song is done playing")
@@ -84,6 +87,7 @@ def play_button_clicked():
         if playback.curr_pos == 0:   
             playback.play()
             print("Starting the song")
+            update_slider_position()
         else:
             playback.resume()
             print("Resuming the song")
@@ -95,7 +99,16 @@ def download_button_clicked():
     
     print("Downloading the song")
     song = filedialog.askopenfilename(initialdir = "songs/", title = "Select a File", filetypes = (("mp3 files", "*.mp3"), ("all files", "*.*")))
-    if song:
+
+    song_downloaded = False
+    # Check if the song is already downloaded
+    for i in range(song_listbox.size()):
+        if song_listbox.get(i) == song:
+            # Eventually add a popup message
+            print("Song already downloaded")
+            song_downloaded = True
+
+    if song and not song_downloaded:
         print("Loading the song from:", song)
         song_listbox.insert(tk.END, song)
         # Ensures that downloading a song won't interrupt the current playback
@@ -130,17 +143,66 @@ def turn_on_autoplay():
 # handles playing the next song after a current song is done. 
 def play_next_song():
     global song_listbox
-    next_song_index = song_listbox.curselection()[0] + 1
-    if next_song_index < song_listbox.size():
-        song = song_listbox.get(next_song_index)
-        print("Playing next song:", song)
-        music_name_label.config(text=song)
-        load_music(song, music_frame)
-        play_button_clicked()
+    current_selection = song_listbox.curselection()
+    if current_selection:
+        next_index = current_selection[0] + 1
+
+        if shuffle == True:
+            select_random_song()
+        else:
+            if next_index < song_listbox.size():
+                
+                select_next_song(next_index)
+            else:
+                # go back to the top of the list
+                select_next_song(0)
+
+def select_next_song(index):
+    song_listbox.selection_clear(0, tk.END)  # Clear previous selection
+    song_listbox.selection_set(index)  # Select the next song
+    song_listbox.activate(index)  # Highlight the next song
+    song = song_listbox.get(index)
+    print("Playing next song:", song)
+    music_name_label.config(text=song)
+    # temporary solution to prevent the slider from updating after the song is done playing
+    if song_slider is not None:
+        if slider_update_id is not None:
+            song_slider.after_cancel(slider_update_id)
+        song_slider.destroy()
+    load_music(song, music_frame)
+    play_button_clicked()
+
+
+
+shuffle = False
+def turn_on_shuffle():
+    global shuffle
+    if shuffle == False:
+        shuffle = True
+        print("Shuffle is on")
     else:
-        print("No more songs to play")
+        shuffle = False
+        print("Shuffle is off")
 
-
+def select_random_song():
+    global song_listbox
+    song_count = song_listbox.size()
+    if song_count > 1:  # Ensure there are at least two songs to choose from
+        current_selection = song_listbox.curselection()
+        if current_selection:
+            current_index = current_selection[0]
+            random_index = current_index
+            # Ensure the next song is different from the current song
+            while random_index == current_index:
+                random_index = random.randint(0, song_count - 1)
+            select_next_song(random_index)
+        else:
+            # If no song is currently selected, select a random song
+            random_index = random.randint(0, song_count - 1)
+            select_next_song(random_index)
+    elif song_count == 1:
+        select_next_song(0)  # Only one song available, select it
+    
 
 
 
@@ -212,6 +274,9 @@ def main():
 
     autoplay_button = tk.Button(other_frame, text="Autoplay", command = turn_on_autoplay)
     autoplay_button.pack()
+
+    shuffle_button = tk.Button(other_frame, text="Shuffle", command = turn_on_shuffle)
+    shuffle_button.pack()
 
 # --------------------------------------------------------------------------------------------------------------------------------------
 
